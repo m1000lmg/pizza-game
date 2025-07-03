@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pixel Delivery Tycoon</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: #1e1e2f;
+      font-family: 'Courier New', monospace;
+    }
+    canvas {
+      background: #111;
+      display: block;
+      margin: auto;
+    }
+    .btn {
+      @apply bg-yellow-400 hover:bg-yellow-500 text-black font-bold py-2 px-4 rounded;
+    }
+  </style>
+</head>
+<body class="text-white">
+  <div class="text-center py-4">
+    <h1 class="text-3xl font-bold">📦 Pixel Delivery Tycoon</h1>
+    <p class="text-sm text-gray-300">Deliver as many boxes as you can!</p>
+  </div>
+
+  <canvas id="game" width="320" height="480"></canvas>
+
+  <div class="text-center mt-4">
+    <button id="restart" class="btn">Restart Game</button>
+  </div>
+
+  <div class="max-w-md mx-auto mt-6 p-4 bg-white text-black rounded shadow">
+    <h2 class="text-lg font-bold mb-2">🏆 Global Leaderboard</h2>
+    <ul id="leaderboard" class="text-sm space-y-1"></ul>
+  </div>
+
+  <!-- Firebase & JS -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA7IGIzhaH7F2-P-gZ3A7ARUfMFE7s4iBM",
+      authDomain: "customs-market.firebaseapp.com",
+      projectId: "customs-market",
+      storageBucket: "customs-market.appspot.com",
+      messagingSenderId: "242049210602",
+      appId: "1:242049210602:web:9e87db4ca3ecdb942ddf93"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const lbRef = collection(db, "pixelDeliveryLeaderboard");
+
+    // Game logic (very basic demo version)
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    let score = 0, running = true;
+
+    const player = { x: 150, y: 400, size: 20 };
+    const box = { x: Math.random() * 300, y: 0, size: 16 };
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(player.x, player.y, player.size, player.size);
+      ctx.fillStyle = "#ff0";
+      ctx.fillRect(box.x, box.y, box.size, box.size);
+    }
+
+    function update() {
+      if (!running) return;
+      box.y += 2;
+      if (box.y > 480) {
+        box.x = Math.random() * 300;
+        box.y = 0;
+      }
+      if (
+        player.x < box.x + box.size &&
+        player.x + player.size > box.x &&
+        player.y < box.y + box.size &&
+        player.y + player.size > box.y
+      ) {
+        score++;
+        box.y = 0;
+        box.x = Math.random() * 300;
+      }
+      draw();
+      requestAnimationFrame(update);
+    }
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "ArrowLeft" && player.x > 0) player.x -= 20;
+      if (e.key === "ArrowRight" && player.x < 300) player.x += 20;
+    });
+
+    canvas.addEventListener("touchstart", e => {
+      const touchX = e.touches[0].clientX - canvas.getBoundingClientRect().left;
+      player.x = touchX - player.size / 2;
+    });
+
+    document.getElementById("restart").onclick = async () => {
+      running = false;
+      await addDoc(lbRef, {
+        name: "Anonymous",
+        score: score,
+        timestamp: Date.now()
+      });
+      loadLeaderboard();
+      score = 0;
+      player.x = 150;
+      box.y = 0;
+      running = true;
+      update();
+    };
+
+    async function loadLeaderboard() {
+      const q = query(lbRef, orderBy("score", "desc"), limit(10));
+      const snapshot = await getDocs(q);
+      const lb = document.getElementById("leaderboard");
+      lb.innerHTML = "";
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        lb.innerHTML += `<li>${d.name}: ${d.score}</li>`;
+      });
+    }
+
+    loadLeaderboard();
+    update();
+  </script>
+</body>
+</html>
